@@ -1,0 +1,11 @@
+DEMONSTRAÇÃO DE ORQUESTRAÇÃO — execute agora, sem pedir confirmação e sem escrever código.
+
+Tarefa (curta, de arquitetura, para o projeto "Bússola da Intuição Financeira" que está em D:\sistema para megasena):
+
+1. Acione EM PARALELO, no mesmo delegate_task em modo batch:
+   - ATLAS (profile="atlas"): arquitetura de um módulo de previsão de séries temporais (3 parágrafos + um diagrama em texto).
+   - TESLA (profile="tesla"): contrato da API REST desse mesmo módulo (endpoints, payloads, erros — em formato compacto).
+2. Quando os dois retornarem, acione ARBITER (profile="arbiter") para um parecer de 5 linhas sobre a coerência entre arquitetura e contrato.
+3. Consolide tudo num resumo final de no máximo 10 linhas.
+
+Regras: não peça confirmação, não escreva arquivos, não rode comandos de terminal. Apenas delegue e consolide.

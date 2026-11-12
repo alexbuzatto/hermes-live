@@ -1,0 +1,11 @@
+# Hermes Live
+__pycache__/
+*.py[cod]
+*.log
+*.png
+shot.png
+shot2.png
+shot3.png
+shot4.png
+.venv/
+.git/

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hermes · Orquestração ao vivo</title>
+<style>
+  :root{
+    --bg:#070b10; --panel:#0d141c; --panel2:#0a1016; --line:#1b2733;
+    --text:#e6edf3; --muted:#8b98a5; --accent:#2ea043; --accent2:#3fb950;
+    --amber:#d29922; --blue:#58a6ff; --purple:#bc8cff; --red:#f85149;
+    --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:radial-gradient(1200px 700px at 50% -10%,#0d1a24 0%,var(--bg) 60%);
+    color:var(--text);font-family:var(--mono);font-size:13px;overflow:hidden;
+  }
+  header{
+    display:flex;align-items:center;gap:18px;padding:12px 18px;
+    border-bottom:1px solid var(--line);background:rgba(10,16,22,.8);backdrop-filter:blur(6px);
+  }
+  header h1{font-size:14px;letter-spacing:.14em;margin:0;font-weight:600;text-transform:uppercase}
+  header h1 span{color:var(--accent)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 10px currentColor}
+  .dot.on{background:var(--accent);color:var(--accent)}
+  .meta{color:var(--muted);font-size:11px}
+  .spacer{flex:1}
+  .stat{display:flex;flex-direction:column;align-items:flex-end;line-height:1.25}
+  .stat b{font-size:15px;color:var(--text)}
+  .stat span{font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  button{
+    background:#101a24;border:1px solid var(--line);color:var(--text);font-family:var(--mono);
+    font-size:11px;padding:6px 12px;border-radius:6px;cursor:pointer;letter-spacing:.06em;
+  }
+  button:hover{border-color:var(--accent);color:var(--accent2)}
+  button.active{background:rgba(46,160,67,.15);border-color:var(--accent);color:var(--accent2)}
+  main{display:grid;grid-template-columns:1fr 430px;height:calc(100% - 57px)}
+  #stage{position:relative;overflow:hidden}
+  #stage svg{width:100%;height:100%;display:block}
+  #side{display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel2);min-height:0}
+  #cards{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+  #events{
+    height:172px;border-top:1px solid var(--line);overflow:auto;padding:8px 12px;background:#080d12;
+  }
+  .ev{display:flex;gap:8px;font-size:11px;color:var(--muted);padding:2px 0;animation:in .35s ease}
+  .ev b{color:#5b6b7b;font-weight:500}
+  .ev.in b{color:var(--blue)} .ev.out b{color:var(--accent2)} .ev.dispatch b{color:var(--amber)} .ev.turn b{color:#5b6b7b}
+  .ev span{color:#b8c4d0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card{
+    border:1px solid var(--line);border-radius:9px;background:linear-gradient(180deg,#0e1720,#0b1219);
+    overflow:hidden;animation:pop .4s ease;
+  }
+  .card .head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .card .head .bot{color:var(--accent2);font-weight:600;letter-spacing:.08em}
+  .card .head .id{color:#5b6b7b;font-size:10px}
+  .card .head .st{margin-left:auto;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)}
+  .card .head .st.done{color:var(--accent)}
+  .card .goal{padding:6px 10px;color:#93a1af;font-size:10.5px;line-height:1.4;border-bottom:1px dashed #16202a;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .lines{padding:6px 10px 9px;display:flex;flex-direction:column;gap:3px;max-height:150px;overflow:hidden}
+  .ln{display:flex;gap:6px;font-size:10.5px;line-height:1.35;animation:in .45s ease}
+  .ln .t{color:#4b5a69;flex:none}
+  .ln .r{flex:none;width:46px;color:#7d8b99;font-size:9.5px}
+  .ln .x{color:#cbd6e2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .ln.assistant .r{color:#7aa2f7} .ln.think .r{color:#8b98a5} .ln.think .x{color:#8b98a5;font-style:italic}
+  .ln.final .r{color:var(--accent2)} .ln.final .x{color:#b7e4c7} .ln.user .r{color:var(--amber)}
+  .empty{color:#4b5a69;text-align:center;padding:30px 10px;font-size:11px;line-height:1.8}
+  /* SVG */
+  .nodeLabel{fill:#9fb0c0;font-size:10px;font-family:var(--mono);text-anchor:middle;letter-spacing:.06em}
+  .nodeRole{fill:#4b5a69;font-size:8px;text-anchor:middle}
+  .edge{stroke:#16222e;stroke-width:1}
+  .edge.hot{stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 5;animation:dash 1s linear infinite}
+  .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.6s ease-out infinite}
+  @keyframes pulse{0%{opacity:.55;transform:scale(1)}70%{opacity:0;transform:scale(1.9)}100%{opacity:0}}
+  @keyframes dash{to{stroke-dashoffset:-20}}
+  @keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  #replayBadge{display:none;color:var(--amber);border:1px solid var(--amber);padding:2px 8px;border-radius:4px;font-size:10px;letter-spacing:.12em}
+  #replayBadge.on{display:inline-block}
+  .hint{position:absolute;bottom:10px;left:16px;font-size:10px;color:#3f4d5a}
+</style>
+</head>
+<body>
+<header>
+  <h1>HERMES <span>//</span> ORQUESTRAÇÃO AO VIVO</h1>
+  <div class="dot" id="dot"></div>
+  <div class="meta" id="gw">conectando…</div>
+  <span id="replayBadge">REPLAY</span>
+  <div class="spacer"></div>
+  <div class="stat"><b id="sTotal">0</b><span>delegações</span></div>
+  <div class="stat"><b id="sRun">0</b><span>ativas</span></div>
+  <div class="stat"><b id="sDone">0</b><span>concluídas</span></div>
+  <div class="stat"><b id="clock">--:--:--</b><span>agora</span></div>
+  <button id="btnReplay">REPLAY DO DIA</button>
+  <button id="btnLive" class="active">AO VIVO</button>
+</header>
+<main>
+  <div id="stage">
+    <svg id="graph" viewBox="0 0 760 620" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="hint">cada feixe = uma delegação do Hermes para um especialista · retorno verde = resultado recebido</div>
+  </div>
+  <div id="side">
+    <div id="cards"><div class="empty">aguardando delegações…<br/>dispares uma tarefa no Hermes</div></div>
+    <div id="events"></div>
+  </div>
+</main>
+<script>
+(() => {
+  "use strict";
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const graph = document.getElementById("graph");
+  const cardsEl = document.getElementById("cards");
+  const eventsEl = document.getElementById("events");
+
+  const HERMES = { x: 380, y: 296, r: 52 };
+  const RING = 232;
+  const ROLEWORDS = [
+    ["athena",  /requisit|hist[oó]ri|escopo|neg[oó]cio|crit[eé]rio de aceita/i],
+    ["atlas",   /arquitetur|adr|modelagem|banco de dados|stack/i],
+    ["tesla",   /api|contrato|integra|mensageria|protocolo|viabilidade/i],
+    ["ada",     /backend|regras de neg[oó]cio|persist[eê]ncia|servi[cç]o|endpoint/i],
+    ["linus",   /front|interface|tela|componente|react|css/i],
+    ["iris",    /design|ux|wireframe|acessibilidade|design system/i],
+    ["sherlock",/teste|qa|defeito|bug|regress[aã]o|evid[eê]ncia/i],
+    ["sentinel",/seguran|owasp|vulnerab|credencia|permiss/i],
+    ["nova",    /devops|docker|ci\/cd|infra|deploy|pipeline/i],
+    ["scribe",  /documenta|manual|readme|changelog|guia/i],
+    ["arbiter", /auditoria|revis[aã]o|parecer|qualidade final/i],
+  ];
+
+  const state = {
+    bots: [], pos: {}, batches: {}, units: {}, unitBot: {}, order: [], particles: [],
+    nodes: {}, edges: {}, replay: false, hermesNode: null,
+    lastEventsKey: "",
+  };
+
+  const el = (name, attrs = {}, parent) => {
+    const n = document.createElementNS(SVGNS, name);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+
+  function layout(bots) {
+    state.bots = bots;
+    state.pos = {};
+    const n = Math.max(bots.length, 1);
+    bots.forEach((b, i) => {
+      const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+      state.pos[b.name] = { x: HERMES.x + Math.cos(a) * RING, y: HERMES.y + Math.sin(a) * RING, angle: a };
+    });
+  }
+
+  function buildGraph() {
+    graph.innerHTML = "";
+    state.nodes = {}; state.edges = {};
+    const defs = el("defs", {}, graph);
+    const glow = el("filter", { id: "glow", x: "-80%", y: "-80%", width: "260%", height: "260%" }, defs);
+    el("feGaussianBlur", { stdDeviation: "6", result: "b" }, glow);
+    const merge = el("feMerge", {}, glow);
+    el("feMergeNode", { in: "b" }, merge);
+    el("feMergeNode", { in: "SourceGraphic" }, merge);
+
+    const gEdges = el("g", { id: "edges" }, graph);
+    for (const b of state.bots) {
+      const p = state.pos[b.name];
+      state.edges[b.name] = el("line", {
+        x1: HERMES.x, y1: HERMES.y, x2: p.x, y2: p.y, class: "edge",
+      }, gEdges);
+    }
+
+    const gHermes = el("g", {}, graph);
+    el("circle", { cx: HERMES.x, cy: HERMES.y, r: HERMES.r + 16, fill: "rgba(46,160,67,.07)" }, gHermes);
+    const pulse = el("circle", {
+      cx: HERMES.x, cy: HERMES.y, r: HERMES.r, fill: "none",
+      stroke: "#2ea043", "stroke-width": "1.2", class: "pulse",
+    }, gHermes);
+    state.hermesRing = pulse;
+    state.hermesNode = el("circle", {
+      cx: HERMES.x, cy: HERMES.y, r: HERMES.r, fill: "#0d2a19", stroke: "#2ea043",
+      "stroke-width": "1.6", filter: "url(#glow)",
+    }, gHermes);
+    el("text", {
+      x: HERMES.x, y: HERMES.y - 4, "text-anchor": "middle", fill: "#d7ffe3",
+      "font-size": "15", "letter-spacing": "3", "font-family": "monospace",
+    }, gHermes).textContent = "HERMES";
+    el("text", {
+      x: HERMES.x, y: HERMES.y + 14, "text-anchor": "middle", fill: "#66a97a",
+      "font-size": "8", "letter-spacing": "1.5", "font-family": "monospace",
+    }, gHermes).textContent = "ORQUESTRADOR";
+
+    const gNodes = el("g", { id: "nodes" }, graph);
+    for (const b of state.bots) {
+      const p = state.pos[b.name];
+      const g = el("g", { transform: `translate(${p.x},${p.y})`, "data-bot": b.name }, gNodes);
+      const ring = el("circle", { r: 30, fill: "none", stroke: "transparent", "stroke-width": "1.2" }, g);
+      const circ = el("circle", {
+        r: 24, fill: "#0b141c", stroke: "#26333f", "stroke-width": "1.4",
+      }, g);
+      const label = el("text", { y: 40, class: "nodeLabel" }, g);
+      label.textContent = b.name.toUpperCase();
+      const role = el("text", { y: 51, class: "nodeRole" }, g);
+      role.textContent = (b.title && b.title.toLowerCase() !== b.name) ? b.title : "";
+      state.nodes[b.name] = { g, ring, circ, label, role, busy: false, flashUntil: 0 };
+    }
+    state.gParticles = el("g", { id: "particles" }, graph);
+  }
+
+  function setBotState(name, mode) {
+    const n = state.nodes[name];
+    if (!n) return;
+    if (mode === "working") {
+      n.busy = true;
+      n.circ.setAttribute("stroke", "#d29922");
+      n.circ.setAttribute("fill", "#241c08");
+      n.ring.setAttribute("stroke", "#d29922");
+      n.ring.classList.add("pulse");
+      state.edges[name].classList.add("hot");
+    } else if (mode === "done") {
+      n.busy = false;
+      n.circ.setAttribute("stroke", "#2ea043");
+      n.circ.setAttribute("fill", "#0d2a19");
+      n.ring.setAttribute("stroke", "#2ea043");
+      n.ring.classList.remove("pulse");
+      n.flashUntil = performance.now() + 4000;
+      state.edges[name].classList.remove("hot");
+    } else {
+      n.busy = false;
+      n.circ.setAttribute("stroke", "#26333f");
+      n.circ.setAttribute("fill", "#0b141c");
+      n.ring.setAttribute("stroke", "transparent");
+      n.ring.classList.remove("pulse");
+      state.edges[name].classList.remove("hot");
+    }
+    const lbl = n.label;
+    lbl.setAttribute("fill", mode === "working" ? "#f0c674" : mode === "done" ? "#7ee2a8" : "#9fb0c0");
+  }
+
+  function pickBot(text) {
+    const goal = text || "";
+    let best = null, bestScore = 0;
+    for (const [name, rx] of ROLEWORDS) {
+      if (!state.nodes[name]) continue;
+      const m = goal.match(rx);
+      if (m) {
+        const score = 1 + (m.index < 40 ? 1 : 0);
+        if (score > bestScore) { best = name; bestScore = score; }
+      }
+    }
+    if (best) return best;
+    const idle = state.bots.filter(b => !state.nodes[b.name].busy);
+    return (idle[0] || state.bots[0]).name;
+  }
+
+  function particles(from, to, color, count, delay = 0) {
+    for (let i = 0; i < count; i++) {
+      state.particles.push({
+        x0: from.x, y0: from.y, x1: to.x, y1: to.y,
+        t0: performance.now() + delay + i * 140, dur: 820, color,
+        r: 3.2 + Math.random() * 1.6,
+      });
+    }
+  }
+
+  function cardFor(batch, task, uid) {
+    let card = document.getElementById("card-" + uid.replace(":", "-"));
+    if (card) return card;
+    card = document.createElement("div");
+    card.className = "card";
+    card.id = "card-" + uid.replace(":", "-");
+    card.innerHTML = `
+      <div class="head">
+        <span class="bot"></span>
+        <span class="id">${batch.id} · ${task.index + 1}/${(batch.tasks || []).length}</span>
+        <span class="st">em andamento</span>
+      </div>
+      <div class="goal"></div>
+      <div class="lines"></div>`;
+    cardsEl.prepend(card);
+    const empty = cardsEl.querySelector(".empty");
+    if (empty) empty.remove();
+    card.querySelector(".goal").textContent = task.goal || "(sem objetivo)";
+    return card;
+  }
+
+  function renderUnit(batch, task, uid) {
+    const card = cardFor(batch, task, uid);
+    const botName = state.unitBot[uid] || "-";
+    card.querySelector(".bot").textContent = botName.toUpperCase();
+    const st = card.querySelector(".st");
+    if (task.status === "completed") {
+      st.textContent = "concluído";
+      st.classList.add("done");
+    }
+    const linesEl = card.querySelector(".lines");
+    const lines = task.lines || [];
+    const shown = Number(card.dataset.shown || "0");
+    if (lines.length < shown) { linesEl.innerHTML = ""; card.dataset.shown = "0"; }
+    for (let i = Number(card.dataset.shown || "0"); i < lines.length; i++) {
+      const L = lines[i];
+      const div = document.createElement("div");
+      div.className = "ln " + L.role;
+      const txt = L.text.length > 260 ? L.text.slice(0, 260) + "…" : L.text;
+      div.innerHTML = `<span class="t">${L.t}</span><span class="r">${L.role}</span><span class="x"></span>`;
+      div.querySelector(".x").textContent = txt;
+      linesEl.appendChild(div);
+      linesEl.scrollTop = linesEl.scrollHeight;
+    }
+    while (linesEl.childElementCount > 6) linesEl.removeChild(linesEl.firstElementChild);
+    card.dataset.shown = String(lines.length);
+  }
+
+  function applyBatch(batch, instant) {
+    const tasks = batch.tasks || [];
+    tasks.forEach(task => {
+      const uid = batch.id + ":" + task.index;
+      const prev = state.units[uid];
+      if (!prev) {
+        const bot = pickBot(task.goal || "");
+        state.unitBot[uid] = bot;
+        state.order.push(uid);
+        setBotState(bot, "working");
+        const to = state.pos[bot];
+        particles({ x: HERMES.x, y: HERMES.y }, { x: to.x, y: to.y }, "#d29922", 4);
+        if (!instant) flashHermes();
+      }
+      state.units[uid] = { status: task.status };
+      renderUnit(batch, task, uid);
+      if (task.status === "completed" && (!prev || prev.status !== "completed")) {
+        const bot = state.unitBot[uid];
+        const p = state.pos[bot];
+        setBotState(bot, "done");
+        particles({ x: p.x, y: p.y }, { x: HERMES.x, y: HERMES.y }, "#2ea043", 4, 160);
+        if (!instant) flashHermes();
+      }
+    });
+  }
+
+  let flashTimer = null;
+  function flashHermes() {
+    const n = state.hermesNode;
+    if (!n) return;
+    n.setAttribute("fill", "#14532d");
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => n.setAttribute("fill", "#0d2a19"), 700);
+  }
+
+  function renderEvents(evts) {
+    const key = evts.map(e => e.at + e.kind).join("|");
+    if (key === state.lastEventsKey) return;
+    state.lastEventsKey = key;
+    eventsEl.innerHTML = "";
+    [...evts].reverse().forEach(e => {
+      const d = document.createElement("div");
+      d.className = "ev " + e.kind;
+      d.innerHTML = `<b>${e.at}</b><span></span>`;
+      d.querySelector("span").textContent = e.text;
+      eventsEl.appendChild(d);
+    });
+  }
+
+  function header(data) {
+    const gw = data.gateway || {};
+    const dot = document.getElementById("dot");
+    dot.classList.toggle("on", !!gw.alive);
+    document.getElementById("gw").textContent =
+      gw.alive ? `gateway pid ${gw.pid} · v${gw.version} · ${gw.active_agents} agente(s)` : "gateway offline";
+    document.getElementById("clock").textContent = data.now;
+    document.getElementById("sTotal").textContent = data.stats.total;
+    document.getElementById("sRun").textContent = data.stats.running;
+    document.getElementById("sDone").textContent = data.stats.completed;
+  }
+
+  function applyState(data) {
+    if (!state.bots.length || state.bots.length !== data.bots.length) {
+      layout(data.bots); buildGraph();
+    }
+    header(data);
+    (data.batches || []).forEach(b => applyBatch(b, false));
+    renderEvents(data.events || []);
+  }
+
+  async function poll() {
+    try {
+      const r = await fetch("/api/state", { cache: "no-store" });
+      const data = await r.json();
+      if (!state.replay) applyState(data);
+    } catch (e) {
+      document.getElementById("gw").textContent = "sem conexão com o painel";
+    }
+  }
+
+  // partículas
+  function tick() {
+    const now = performance.now();
+    if (!state.gParticles) { requestAnimationFrame(tick); return; }
+    state.gParticles.innerHTML = "";
+    state.particles = state.particles.filter(p => now - p.t0 < p.dur + 50);
+    for (const p of state.particles) {
+      const k = (now - p.t0) / p.dur;
+      if (k < 0) continue;
+      const e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      const x = p.x0 + (p.x1 - p.x0) * e;
+      const y = p.y0 + (p.y1 - p.y0) * e;
+      const o = k > .85 ? (1 - k) / .15 : 1;
+      el("circle", { cx: x, cy: y, r: p.r, fill: p.color, opacity: o.toFixed(2) }, state.gParticles);
+    }
+    for (const [name, n] of Object.entries(state.nodes)) {
+      if (n.flashUntil && now > n.flashUntil) { n.flashUntil = 0; setBotState(name, "idle"); }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // replay
+  document.getElementById("btnReplay").addEventListener("click", async () => {
+    setMode(true);
+    try {
+      const r = await fetch("/api/replay", { cache: "no-store" });
+      const data = await r.json();
+      if (!state.bots.length) { layout(data.bots); buildGraph(); }
+      document.getElementById("replayBadge").classList.add("on");
+      const bs = (data.batches || []).slice().sort((a, b) => String(a.started).localeCompare(String(b.started)));
+      for (const b of bs) {
+        const running = { ...b, status: "running", completed: null, tasks: (b.tasks || []).map(t => ({ ...t, status: "running" })) };
+        applyBatch(running, true);
+        await sleep(1500);
+        applyBatch({ ...b, status: "completed" }, false);
+        await sleep(900);
+      }
+    } catch (e) { /* ignore */ }
+  });
+  document.getElementById("btnLive").addEventListener("click", () => setMode(false));
+  function setMode(replay) {
+    state.replay = replay;
+    document.getElementById("btnLive").classList.toggle("active", !replay);
+    document.getElementById("btnReplay").classList.toggle("active", replay);
+    document.getElementById("replayBadge").classList.toggle("on", replay);
+  }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // boot
+  (async () => {
+    const r = await fetch("/api/state", { cache: "no-store" });
+    const data = await r.json();
+    layout(data.bots); buildGraph();
+    applyState(data);
+    requestAnimationFrame(tick);
+    setInterval(poll, 850);
+    if (/[?&]replay/.test(location.search)) setTimeout(() => document.getElementById("btnReplay").click(), 600);
+  })();
+})();
+</script>
+</body>
+</html>
